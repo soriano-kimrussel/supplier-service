@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: supplier
+      POSTGRES_PASSWORD: supplier
+      POSTGRES_DB: supplier
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supplier"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://supplier:supplier@db:5432/supplier
+      SUPPLIER_API_BASE_URL: ${SUPPLIER_API_BASE_URL:-https://directory.example.com}
+      SUPPLIER_API_KEY: ${SUPPLIER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ["python", "-m", "app.workers.enrichment_worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://supplier:supplier@db:5432/supplier
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
